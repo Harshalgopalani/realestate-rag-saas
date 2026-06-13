@@ -1,0 +1,9 @@
+chromadb==0.4.24
+PyMuPDF==1.23.21
+ollama==0.1.7
+fastapi
+uvicorn
+pydantic
+python-multipart
+sqlalchemy
+numpy<2.0.0

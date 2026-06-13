@@ -1,0 +1,11 @@
+python -m venv venv
+
+# Activate it (Windows):
+venv\Scripts\activate
+# Activate it (Mac/Linux):
+source venv/bin/activate
+
+uvicorn main:app --reload #server starting fastapi
+
+npm run dev #Node front end activation
+

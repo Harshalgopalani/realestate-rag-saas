@@ -1,0 +1,20 @@
+# Python Virtual Environment
+venv/
+__pycache__/
+*.pyc
+
+# Node.js and Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env.local
+
+# Databases and Uploads (Never push customer data or vector DBs to GitHub!)
+backend/chroma_db/
+backend/leads.db
+backend/documents/*
+!backend/documents/.gitkeep
+
+# OS Files
+.DS_Store
+Thumbs.db

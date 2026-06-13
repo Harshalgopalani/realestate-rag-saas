@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/chroma_db:/app/chroma_db
+      - ./backend/documents:/app/documents
+      - ./backend/leads.db:/app/leads.db
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - OLLAMA_HOST=http://host.docker.internal:11434
+      - ANONYMIZED_TELEMETRY=False  # <-- NEW: Silences the telemetry crash
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
