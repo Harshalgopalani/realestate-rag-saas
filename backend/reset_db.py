@@ -18,7 +18,7 @@ else:
 
 # 2. Re-import database structures to auto-generate a pristine schema
 try:
-    from database import Base, engine
+    from backend.database import Base, engine
     print("Re-initializing pristine database tables...")
     Base.metadata.create_all(bind=engine)
     print("SUCCESS: Database schemas built cleanly with 'tenant_id' infrastructure!")
