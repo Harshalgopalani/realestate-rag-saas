@@ -5,7 +5,7 @@ import { Send, Bot, User, ArrowRight } from "lucide-react";
 
 // 1. THIS IS OUR SIMULATED WIDGET INSTALLATION
 // Change this to "godrej" later to watch the UI break/change!
-const TENANT_ID = "kukreja_paris"; 
+const TENANT_ID = "kukreja_paris";
 
 type Message = {
   role: "user" | "assistant";
@@ -15,9 +15,13 @@ type Message = {
 export default function Home() {
   const [isLeadCaptured, setIsLeadCaptured] = useState(false);
   const [leadForm, setLeadForm] = useState({ name: "", phone: "", email: "" });
-  
+
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: "Hello! I am your Virtual Assistant. How can I help you with your new home today?" }
+    {
+      role: "assistant",
+      content:
+        "Hello! I am your Virtual Assistant. How can I help you with your new home today?",
+    },
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -25,19 +29,19 @@ export default function Home() {
   const handleLeadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     try {
-      const response = await fetch("http://localhost:8000/api/leads", {
+      const response = await fetch("http://144.91.127.152:8000/api/leads", {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
-          "x-tenant-id": TENANT_ID // <-- PASSING THE BADGE
+          "x-tenant-id": TENANT_ID, // <-- PASSING THE BADGE
         },
         body: JSON.stringify(leadForm),
       });
 
       if (response.ok) {
-        setIsLeadCaptured(true); 
+        setIsLeadCaptured(true);
       } else {
         alert("Something went wrong. Please try again.");
       }
@@ -55,15 +59,15 @@ export default function Home() {
 
     const userMessage: Message = { role: "user", content: input };
     setMessages((prev) => [...prev, userMessage]);
-    setInput(""); 
-    setIsLoading(true); 
+    setInput("");
+    setIsLoading(true);
 
     try {
-      const response = await fetch("http://localhost:8000/api/chat", {
+      const response = await fetch("http://144.91.127.152:8000/api/chat", {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
-          "x-tenant-id": TENANT_ID // <-- PASSING THE BADGE
+          "x-tenant-id": TENANT_ID, // <-- PASSING THE BADGE
         },
         body: JSON.stringify({ question: userMessage.content }),
       });
@@ -73,10 +77,12 @@ export default function Home() {
       const data = await response.json();
       const botMessage: Message = { role: "assistant", content: data.answer };
       setMessages((prev) => [...prev, botMessage]);
-      
     } catch (error) {
       console.error("Error:", error);
-      setMessages((prev) => [...prev, { role: "assistant", content: "Server connection failed." }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: "Server connection failed." },
+      ]);
     } finally {
       setIsLoading(false);
     }
@@ -85,7 +91,6 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
       <div className="w-full max-w-2xl bg-white rounded-xl shadow-xl flex flex-col h-[85vh] max-h-[800px]">
-        
         <div className="bg-blue-900 text-white p-4 flex items-center shadow-md z-10">
           <Bot className="mr-2" size={24} />
           <h1 className="text-xl font-bold">Property Assistant</h1>
@@ -95,29 +100,51 @@ export default function Home() {
           <div className="flex-1 flex flex-col justify-center items-center p-8 bg-gray-50 overflow-y-auto">
             <Bot size={48} className="text-blue-600 mb-4" />
             <h2 className="text-2xl font-bold text-gray-800 mb-2">Welcome</h2>
-            <p className="text-gray-600 mb-8 text-center">Please enter your details to chat with our AI property assistant.</p>
-            
-            <form onSubmit={handleLeadSubmit} className="w-full max-w-sm space-y-4">
-              <input 
-                required type="text" placeholder="Full Name" 
+            <p className="text-gray-600 mb-8 text-center">
+              Please enter your details to chat with our AI property assistant.
+            </p>
+
+            <form
+              onSubmit={handleLeadSubmit}
+              className="w-full max-w-sm space-y-4"
+            >
+              <input
+                required
+                type="text"
+                placeholder="Full Name"
                 className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none text-black"
-                value={leadForm.name} onChange={(e) => setLeadForm({...leadForm, name: e.target.value})}
+                value={leadForm.name}
+                onChange={(e) =>
+                  setLeadForm({ ...leadForm, name: e.target.value })
+                }
               />
-              <input 
-                required type="email" placeholder="Email Address" 
+              <input
+                required
+                type="email"
+                placeholder="Email Address"
                 className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none text-black"
-                value={leadForm.email} onChange={(e) => setLeadForm({...leadForm, email: e.target.value})}
+                value={leadForm.email}
+                onChange={(e) =>
+                  setLeadForm({ ...leadForm, email: e.target.value })
+                }
               />
-              <input 
-                required type="tel" placeholder="Phone Number" 
+              <input
+                required
+                type="tel"
+                placeholder="Phone Number"
                 className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none text-black"
-                value={leadForm.phone} onChange={(e) => setLeadForm({...leadForm, phone: e.target.value})}
+                value={leadForm.phone}
+                onChange={(e) =>
+                  setLeadForm({ ...leadForm, phone: e.target.value })
+                }
               />
-              <button 
-                type="submit" disabled={isLoading}
+              <button
+                type="submit"
+                disabled={isLoading}
                 className="w-full bg-blue-600 text-white font-bold rounded-lg px-4 py-3 hover:bg-blue-700 transition-colors flex justify-center items-center"
               >
-                {isLoading ? "Starting Chat..." : "Start Chatting"} <ArrowRight size={18} className="ml-2" />
+                {isLoading ? "Starting Chat..." : "Start Chatting"}{" "}
+                <ArrowRight size={18} className="ml-2" />
               </button>
             </form>
           </div>
@@ -125,10 +152,19 @@ export default function Home() {
           <>
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
               {messages.map((msg, index) => (
-                <div key={index} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div className={`flex max-w-[80%] rounded-lg p-3 ${msg.role === "user" ? "bg-blue-600 text-white" : "bg-white border border-gray-200 text-gray-800 shadow-sm"}`}>
+                <div
+                  key={index}
+                  className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                >
+                  <div
+                    className={`flex max-w-[80%] rounded-lg p-3 ${msg.role === "user" ? "bg-blue-600 text-white" : "bg-white border border-gray-200 text-gray-800 shadow-sm"}`}
+                  >
                     <div className="mr-2 mt-1">
-                      {msg.role === "user" ? <User size={16} /> : <Bot size={16} className="text-blue-600" />}
+                      {msg.role === "user" ? (
+                        <User size={16} />
+                      ) : (
+                        <Bot size={16} className="text-blue-600" />
+                      )}
                     </div>
                     <div className="text-sm leading-relaxed whitespace-pre-wrap text-black">
                       {msg.content}
@@ -139,19 +175,33 @@ export default function Home() {
               {isLoading && (
                 <div className="flex justify-start">
                   <div className="bg-white border border-gray-200 text-gray-500 shadow-sm rounded-lg p-3 text-sm flex items-center">
-                    <Bot size={16} className="mr-2 text-blue-600 animate-pulse" /> Thinking...
+                    <Bot
+                      size={16}
+                      className="mr-2 text-blue-600 animate-pulse"
+                    />{" "}
+                    Thinking...
                   </div>
                 </div>
               )}
             </div>
 
-            <form onSubmit={sendMessage} className="p-4 bg-white border-t border-gray-200 flex">
+            <form
+              onSubmit={sendMessage}
+              className="p-4 bg-white border-t border-gray-200 flex"
+            >
               <input
-                type="text" value={input} onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask about pricing, amenities..." disabled={isLoading}
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Ask about pricing, amenities..."
+                disabled={isLoading}
                 className="flex-1 border border-gray-300 rounded-l-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
               />
-              <button type="submit" disabled={isLoading || !input.trim()} className="bg-blue-600 text-white px-4 py-2 rounded-r-lg hover:bg-blue-700 disabled:bg-blue-300 transition-colors">
+              <button
+                type="submit"
+                disabled={isLoading || !input.trim()}
+                className="bg-blue-600 text-white px-4 py-2 rounded-r-lg hover:bg-blue-700 disabled:bg-blue-300 transition-colors"
+              >
                 <Send size={18} />
               </button>
             </form>

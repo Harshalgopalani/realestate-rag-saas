@@ -32,14 +32,11 @@ export default function Dashboard() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(
-        "http://localhost:8000/api/leads",
-        {
-          headers: {
-            "x-tenant-id": TENANT_ID,
-          },
-        }
-      );
+      const response = await fetch("http://144.91.127.152:8000/api/leads", {
+        headers: {
+          "x-tenant-id": TENANT_ID,
+        },
+      });
 
       if (!response.ok) {
         throw new Error("Failed to fetch leads");
@@ -62,13 +59,7 @@ export default function Dashboard() {
     }
 
     // CSV Headers
-    const headers = [
-      "ID",
-      "Name",
-      "Email",
-      "Phone",
-      "Date Captured",
-    ];
+    const headers = ["ID", "Name", "Email", "Phone", "Date Captured"];
 
     // CSV Rows
     const csvRows = leads.map((lead) => {
@@ -77,17 +68,12 @@ export default function Dashboard() {
         `"${lead.name}"`,
         `"${lead.email}"`,
         `"${lead.phone}"`,
-        `"${new Date(
-          lead.created_at
-        ).toLocaleDateString()}"`,
+        `"${new Date(lead.created_at).toLocaleDateString()}"`,
       ].join(",");
     });
 
     // Combine Headers + Data
-    const csvContent = [
-      headers.join(","),
-      ...csvRows,
-    ].join("\n");
+    const csvContent = [headers.join(","), ...csvRows].join("\n");
 
     // Create Downloadable File
     const blob = new Blob([csvContent], {
@@ -100,9 +86,7 @@ export default function Dashboard() {
     link.href = url;
     link.setAttribute(
       "download",
-      `leads_export_${
-        new Date().toISOString().split("T")[0]
-      }.csv`
+      `leads_export_${new Date().toISOString().split("T")[0]}.csv`,
     );
 
     document.body.appendChild(link);
@@ -123,9 +107,7 @@ export default function Dashboard() {
       <div className="w-full md:w-64 bg-slate-900 text-white flex flex-col p-4 shadow-xl">
         <div className="flex items-center space-x-2 mb-8 mt-2 px-2">
           <LayoutDashboard className="text-blue-400" />
-          <h1 className="text-xl font-bold tracking-wider">
-            SaaS Admin
-          </h1>
+          <h1 className="text-xl font-bold tracking-wider">SaaS Admin</h1>
         </div>
 
         <nav className="space-y-2 flex-1">
@@ -135,7 +117,10 @@ export default function Dashboard() {
             <span>Lead Center</span>
           </button>
           {/* Clickable Link to Upload Knowledge Base */}
-          <Link href="/dashboard/upload" className="w-full flex items-center space-x-3 px-4 py-3 text-gray-300 hover:bg-slate-800 hover:text-white rounded-lg text-sm font-medium transition-colors">
+          <Link
+            href="/dashboard/upload"
+            className="w-full flex items-center space-x-3 px-4 py-3 text-gray-300 hover:bg-slate-800 hover:text-white rounded-lg text-sm font-medium transition-colors"
+          >
             <UploadCloud size={18} />
             <span>Knowledge Base</span>
           </Link>
@@ -147,12 +132,9 @@ export default function Dashboard() {
         {/* Dashboard Header */}
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h2 className="text-3xl font-bold text-gray-800">
-              Captured Leads
-            </h2>
+            <h2 className="text-3xl font-bold text-gray-800">Captured Leads</h2>
             <p className="text-gray-500 mt-1">
-              Manage and analyze prospective
-              homebuyers.
+              Manage and analyze prospective homebuyers.
             </p>
           </div>
 
@@ -163,9 +145,7 @@ export default function Dashboard() {
             >
               <RefreshCw
                 size={16}
-                className={
-                  isLoading ? "animate-spin" : ""
-                }
+                className={isLoading ? "animate-spin" : ""}
               />
               <span>Refresh</span>
             </button>
@@ -186,37 +166,23 @@ export default function Dashboard() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200 text-sm text-gray-500 uppercase tracking-wider">
-                  <th className="p-4 font-medium">
-                    ID
-                  </th>
-                  <th className="p-4 font-medium">
-                    Name
-                  </th>
-                  <th className="p-4 font-medium">
-                    Contact Info
-                  </th>
-                  <th className="p-4 font-medium">
-                    Captured Date
-                  </th>
+                  <th className="p-4 font-medium">ID</th>
+                  <th className="p-4 font-medium">Name</th>
+                  <th className="p-4 font-medium">Contact Info</th>
+                  <th className="p-4 font-medium">Captured Date</th>
                 </tr>
               </thead>
 
               <tbody className="divide-y divide-gray-200">
                 {isLoading ? (
                   <tr>
-                    <td
-                      colSpan={4}
-                      className="p-8 text-center text-gray-500"
-                    >
+                    <td colSpan={4} className="p-8 text-center text-gray-500">
                       Loading leads...
                     </td>
                   </tr>
                 ) : leads.length === 0 ? (
                   <tr>
-                    <td
-                      colSpan={4}
-                      className="p-8 text-center text-gray-500"
-                    >
+                    <td colSpan={4} className="p-8 text-center text-gray-500">
                       No leads captured yet.
                     </td>
                   </tr>
@@ -226,27 +192,21 @@ export default function Dashboard() {
                       key={lead.id}
                       className="hover:bg-gray-50 transition-colors"
                     >
-                      <td className="p-4 text-gray-500">
-                        #{lead.id}
-                      </td>
+                      <td className="p-4 text-gray-500">#{lead.id}</td>
 
                       <td className="p-4 font-medium text-gray-900">
                         {lead.name}
                       </td>
 
                       <td className="p-4">
-                        <div className="text-gray-900">
-                          {lead.email}
-                        </div>
+                        <div className="text-gray-900">{lead.email}</div>
                         <div className="text-gray-500 text-sm">
                           {lead.phone}
                         </div>
                       </td>
 
                       <td className="p-4 text-gray-500">
-                        {new Date(
-                          lead.created_at
-                        ).toLocaleDateString()}
+                        {new Date(lead.created_at).toLocaleDateString()}
                       </td>
                     </tr>
                   ))
@@ -259,4 +219,3 @@ export default function Dashboard() {
     </div>
   );
 }
-
