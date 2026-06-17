@@ -58,7 +58,14 @@ export default function Home() {
     if (!input.trim()) return;
 
     const userMessage: Message = { role: "user", content: input };
-    setMessages((prev) => [...prev, userMessage]);
+    
+    // 1. Add the user's message AND an empty bot message immediately
+    setMessages((prev) => [
+      ...prev, 
+      userMessage,
+      { role: "assistant", content: "" } // Placeholder for the stream
+    ]);
+    
     setInput("");
     setIsLoading(true);
 
@@ -67,22 +74,49 @@ export default function Home() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-tenant-id": TENANT_ID, // <-- PASSING THE BADGE
+          "x-tenant-id": TENANT_ID,
         },
         body: JSON.stringify({ question: userMessage.content }),
       });
 
       if (!response.ok) throw new Error("Failed to connect to the backend.");
+      
+      // 2. The Streaming Receiver (The Magic Part)
+      if (!response.body) throw new Error("No response body");
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let isDone = false;
 
-      const data = await response.json();
-      const botMessage: Message = { role: "assistant", content: data.answer };
-      setMessages((prev) => [...prev, botMessage]);
+      // Keep reading chunks of text until the AI finishes
+      while (!isDone) {
+        const { value, done } = await reader.read();
+        isDone = done;
+        
+        if (value) {
+          const chunk = decoder.decode(value, { stream: true });
+          
+          // Update the very last message in the array (the bot's message) by appending the new chunk
+          setMessages((prev) => {
+            const updatedMessages = [...prev];
+            const lastIndex = updatedMessages.length - 1;
+            updatedMessages[lastIndex] = {
+              ...updatedMessages[lastIndex],
+              content: updatedMessages[lastIndex].content + chunk,
+            };
+            return updatedMessages;
+          });
+        }
+      }
+
     } catch (error) {
       console.error("Error:", error);
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: "Server connection failed." },
-      ]);
+      setMessages((prev) => {
+          const updatedMessages = [...prev];
+          const lastIndex = updatedMessages.length - 1;
+          // If it fails, overwrite the placeholder with the error
+          updatedMessages[lastIndex] = { role: "assistant", content: "Server connection failed." };
+          return updatedMessages;
+      });
     } finally {
       setIsLoading(false);
     }

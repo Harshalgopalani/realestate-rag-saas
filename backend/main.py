@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File, Depends, Header
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import chromadb
@@ -136,15 +137,26 @@ async def chat_endpoint(
         {context}
         """
 
-        response = ollama.chat(
-            model=LLM_MODEL,
-            messages=[
-                {'role': 'system', 'content': system_prompt},
-                {'role': 'user', 'content': request.question}
-            ],
-            stream=False 
-        )
-        return {"answer": response['message']['content']}
+        # ---------------------------------------------------------
+        # NEW: THE STREAMING ENGINE
+        # This function yields words instantly as they are generated
+        # ---------------------------------------------------------
+        def generate_response():
+            stream = ollama.chat(
+                model=LLM_MODEL,
+                messages=[
+                    {'role': 'system', 'content': system_prompt},
+                    {'role': 'user', 'content': request.question}
+                ],
+                stream=True  # The typewriter is turned ON
+            )
+            for chunk in stream:
+                # Yield the exact text chunk back to the browser
+                yield chunk['message']['content']
+
+        # Wrap the generator in a continuous HTTP stream
+        return StreamingResponse(generate_response(), media_type="text/plain")
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
