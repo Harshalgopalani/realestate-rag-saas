@@ -21,7 +21,7 @@ app.add_middleware(
 
 DB_PATH = "./chroma_db"
 COLLECTION_NAME = "real_estate_docs"
-LLM_MODEL = "qwen2.5:3b"
+LLM_MODEL = "llama3.2:1b"
 
 os.makedirs("documents", exist_ok=True)
 
