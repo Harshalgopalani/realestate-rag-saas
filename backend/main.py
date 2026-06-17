@@ -5,12 +5,16 @@ from pydantic import BaseModel
 import chromadb
 import ollama
 import os
+from groq import Groq
 import shutil
 import fitz 
 from database import SessionLocal, Lead
 from sqlalchemy.orm import Session
 
 app = FastAPI(title="Real Estate RAG API - Multi-Tenant", version="2.0")
+
+# This automatically looks for the GROQ_API_KEY environment variable
+groq_client = Groq()
 
 app.add_middleware(
     CORSMiddleware,
@@ -141,18 +145,22 @@ async def chat_endpoint(
         # NEW: THE STREAMING ENGINE
         # This function yields words instantly as they are generated
         # ---------------------------------------------------------
+        # ---------------------------------------------------------
+        # THE GROQ LPU STREAMING ENGINE
+        # ---------------------------------------------------------
         def generate_response():
-            stream = ollama.chat(
-                model=LLM_MODEL,
+            stream = groq_client.chat.completions.create(
+                model="llama-3.3-70b-versatile", # A massive, genius-level model
                 messages=[
                     {'role': 'system', 'content': system_prompt},
                     {'role': 'user', 'content': request.question}
                 ],
-                stream=True  # The typewriter is turned ON
+                stream=True
             )
             for chunk in stream:
-                # Yield the exact text chunk back to the browser
-                yield chunk['message']['content']
+                # Groq formats their chunks slightly differently than Ollama
+                if chunk.choices[0].delta.content is not None:
+                    yield chunk.choices[0].delta.content
 
         # Wrap the generator in a continuous HTTP stream
         return StreamingResponse(generate_response(), media_type="text/plain")

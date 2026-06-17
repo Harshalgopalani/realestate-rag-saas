@@ -14,6 +14,7 @@ services:
     environment:
       - OLLAMA_HOST=http://host.docker.internal:11434
       - ANONYMIZED_TELEMETRY=False  # <-- NEW: Silences the telemetry crash
+      - GROQ_API_KEY=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
 
   frontend:
     build: ./frontend
