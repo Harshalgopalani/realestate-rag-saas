@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, Depends, Header
+from fastapi import FastAPI, HTTPException, UploadFile, File, Depends, Header, Request, Query
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -195,3 +195,42 @@ async def get_leads(
         return leads
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+
+# ---------------------------------------------------------
+# WHATSAPP CLOUD API INTEGRATION
+# ---------------------------------------------------------
+
+# This is a secret password we make up. Meta will use this to verify it's talking to YOU.
+WHATSAPP_VERIFY_TOKEN = "kukreja_secure_token_123" 
+
+@app.get("/api/webhook")
+async def verify_whatsapp_webhook(
+    hub_mode: str = Query(None, alias="hub.mode"),
+    hub_challenge: int = Query(None, alias="hub.challenge"),
+    hub_verify_token: str = Query(None, alias="hub.verify_token")
+):
+    """
+    Step 1: The Handshake. 
+    When you configure Meta, they will send a GET request here. 
+    If the token matches, we return the challenge number.
+    """
+    if hub_mode == "subscribe" and hub_verify_token == WHATSAPP_VERIFY_TOKEN:
+        print("Meta Webhook Verified Successfully!")
+        return hub_challenge
+    
+    raise HTTPException(status_code=403, detail="Invalid verification token")
+
+@app.post("/api/webhook")
+async def receive_whatsapp_message(request: Request):
+    """
+    Step 2: The Receiver.
+    Once verified, Meta will POST all buyer WhatsApp messages here.
+    """
+    body = await request.json()
+    
+    # Just print the incoming message to the server logs for now so we can see it working!
+    print("NEW WHATSAPP MESSAGE RECEIVED:\n", body)
+    
+    # Meta requires a fast 200 OK response or they will think our server is dead
+    return {"status": "success"}
