@@ -31,7 +31,7 @@ export default function Home() {
     setIsLoading(true);
 
     try {
-      const response = await fetch("http://144.91.127.152:8000/api/leads", {
+      const response = await fetch("https://richportfolio.duckdns.org/api/leads", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -70,7 +70,7 @@ export default function Home() {
     setIsLoading(true);
 
     try {
-      const response = await fetch("http://144.91.127.152:8000/api/chat", {
+      const response = await fetch("https://richportfolio.duckdns.org/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
