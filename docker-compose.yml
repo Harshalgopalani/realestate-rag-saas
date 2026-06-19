@@ -12,9 +12,11 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
-      - OLLAMA_HOST=http://host.docker.internal:11434
-      - ANONYMIZED_TELEMETRY=False  # <-- NEW: Silences the telemetry crash
-      - GROQ_API_KEY=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
+      - OLLAMA_HOST=http://ollama:11434
+      - ANONYMIZED_TELEMETRY=False
+      - GROQ_API_KEY=gsk_YOUR_GROQ_KEY # Keep your existing Groq key here
+      - WHATSAPP_TOKEN=EAAOMphUTBfwBRzhAd4mwYaB0nfAgBfpySjAV6zs7ZARxi0D9p46DQXHF4niG5ZCFvfYc5sa50j8gvWKWZAjLJhaLFGLGlLtET8fOEIXAZAv7HhBjTtkZCxlVyQtBRu6r3er5qOuutOaknPWtVl7STvW15kzINUI76Oax2WCZBvJQ1XZANMnjhjCgdg5orDTZCdNLBWJbSWW1mO7QLrJsdGTkHCxMO1hSZCZC3C5CDQGAPpm4Sht2WFd7NLVIq3CaU6hvmT95U02Lk5wd8ZCXjZC9C0wgU3A9jacr26TeigZDZD
+      - WHATSAPP_PHONE_ID=1238435072684922
 
   frontend:
     build: ./frontend

@@ -6,6 +6,7 @@ import chromadb
 import ollama
 import os
 from groq import Groq
+import requests
 import shutil
 import fitz 
 from database import SessionLocal, Lead
@@ -221,16 +222,94 @@ async def verify_whatsapp_webhook(
     
     raise HTTPException(status_code=403, detail="Invalid verification token")
 
+# Load WhatsApp secrets from the server environment
+WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
+WHATSAPP_PHONE_ID = os.getenv("WHATSAPP_PHONE_ID")
+
 @app.post("/api/webhook")
 async def receive_whatsapp_message(request: Request):
     """
-    Step 2: The Receiver.
-    Once verified, Meta will POST all buyer WhatsApp messages here.
+    Step 2: The Receiver & Replier.
+    Meta posts the WhatsApp message here. We read it, ask Groq, and reply.
     """
-    body = await request.json()
-    
-    # Just print the incoming message to the server logs for now so we can see it working!
-    print("NEW WHATSAPP MESSAGE RECEIVED:\n", body)
-    
-    # Meta requires a fast 200 OK response or they will think our server is dead
-    return {"status": "success"}
+    try:
+        body = await request.json()
+        
+        # Meta sends a lot of background noise (delivery receipts, etc.). 
+        # We ONLY want to process actual text messages.
+        if "entry" in body and body["entry"][0]["changes"][0]["value"].get("messages"):
+            message_info = body["entry"][0]["changes"][0]["value"]["messages"][0]
+            
+            if message_info["type"] == "text":
+                user_phone = message_info["from"]
+                user_message = message_info["text"]["body"]
+                
+                print(f"[WHATSAPP] Message from {user_phone}: {user_message}")
+                
+                # --- 1. RAG PIPELINE (Search ChromaDB) ---
+                # For this MVP, we route all WhatsApp traffic to our Kukreja Paris tenant
+                target_tenant = "kukreja_paris"
+                
+                client = chromadb.PersistentClient(path=DB_PATH)
+                collection = client.get_collection(name=COLLECTION_NAME)
+                
+                query_embedding = ollama.embeddings(model="nomic-embed-text", prompt=user_message)["embedding"]
+                
+                results = collection.query(
+                    query_embeddings=[query_embedding],
+                    n_results=4,
+                    where={"tenant_id": target_tenant} 
+                )
+                
+                context = ""
+                if results['documents'] and results['documents'][0]:
+                    context = "\n\n---\n\n".join(results['documents'][0])
+                    
+                system_prompt = f"""You are a helpful real estate assistant. 
+                You must answer ONLY using the context below. 
+                If it's not in the context, say EXACTLY: "I do not have verified information regarding that."
+                Keep your answers concise, professional, and formatted nicely for a WhatsApp screen.
+                
+                CONTEXT:
+                {context}
+                """
+
+                # --- 2. GENERATE ANSWER (Groq LPUs) ---
+                # Notice stream=False. WhatsApp requires the full message at once!
+                response = groq_client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=[
+                        {'role': 'system', 'content': system_prompt},
+                        {'role': 'user', 'content': user_message}
+                    ],
+                    stream=False
+                )
+                
+                ai_answer = response.choices[0].message.content
+                print(f"[WHATSAPP] AI Answer Generated.")
+
+                # --- 3. SEND THE REPLY TO WHATSAPP ---
+                url = f"https://graph.facebook.com/v18.0/{WHATSAPP_PHONE_ID}/messages"
+                headers = {
+                    "Authorization": f"Bearer {WHATSAPP_TOKEN}",
+                    "Content-Type": "application/json"
+                }
+                payload = {
+                    "messaging_product": "whatsapp",
+                    "to": user_phone,
+                    "type": "text",
+                    "text": {"body": ai_answer}
+                }
+                
+                send_response = requests.post(url, headers=headers, json=payload)
+                if send_response.status_code == 200:
+                    print("[WHATSAPP] Reply sent successfully!")
+                else:
+                    print(f"[WHATSAPP] Error sending reply: {send_response.text}")
+                
+        # Always return 200 OK fast so Meta knows our server didn't crash
+        return {"status": "success"}
+        
+    except Exception as e:
+        print(f"[WHATSAPP ERROR]: {e}")
+        return {"status": "error"}
