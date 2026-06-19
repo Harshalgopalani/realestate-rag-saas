@@ -226,35 +226,50 @@ async def verify_whatsapp_webhook(
 WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
 WHATSAPP_PHONE_ID = os.getenv("WHATSAPP_PHONE_ID")
 
+# ---------------------------------------------------------
+# THE MULTI-TENANT ROUTING ENGINE
+# ---------------------------------------------------------
+# In the future, this will be a database table. For now, it's an in-memory directory.
+# We use your current test number ID and map it to Kukreja Paris.
+TENANT_ROUTER = {
+    os.getenv("WHATSAPP_PHONE_ID"): "kukreja_paris",
+    # Example of how you will add your second client tomorrow:
+    # "109876543212345": "godrej_properties" 
+}
+
 @app.post("/api/webhook")
 async def receive_whatsapp_message(request: Request):
-    """
-    Step 2: The Receiver & Replier.
-    Meta posts the WhatsApp message here. We read it, ask Groq, and reply.
-    """
     try:
         body = await request.json()
         
-        # Meta sends a lot of background noise (delivery receipts, etc.). 
-        # We ONLY want to process actual text messages.
         if "entry" in body and body["entry"][0]["changes"][0]["value"].get("messages"):
             message_info = body["entry"][0]["changes"][0]["value"]["messages"][0]
             
+            # --- THE NEW DYNAMIC ROUTING LOGIC ---
+            # Extract exactly WHICH agency number the buyer texted
+            metadata = body["entry"][0]["changes"][0]["value"].get("metadata", {})
+            business_phone_id = metadata.get("phone_number_id")
+            
+            # Look up the tenant in our directory
+            target_tenant = TENANT_ROUTER.get(business_phone_id)
+            
+            if not target_tenant:
+                print(f"[ROUTING ERROR] Unrecognized business phone ID: {business_phone_id}")
+                return {"status": "success"} # Tell Meta 200 OK so they don't keep retrying
+
             if message_info["type"] == "text":
                 user_phone = message_info["from"]
                 user_message = message_info["text"]["body"]
                 
-                print(f"[WHATSAPP] Message from {user_phone}: {user_message}")
+                print(f"[WHATSAPP] Message routed to tenant: {target_tenant}")
                 
-                # --- 1. RAG PIPELINE (Search ChromaDB) ---
-                # For this MVP, we route all WhatsApp traffic to our Kukreja Paris tenant
-                target_tenant = "kukreja_paris"
-                
+                # --- 1. DYNAMIC RAG PIPELINE ---
                 client = chromadb.PersistentClient(path=DB_PATH)
                 collection = client.get_collection(name=COLLECTION_NAME)
                 
                 query_embedding = ollama.embeddings(model="nomic-embed-text", prompt=user_message)["embedding"]
                 
+                # The search is now dynamically filtered by whichever tenant was detected!
                 results = collection.query(
                     query_embeddings=[query_embedding],
                     n_results=4,
@@ -265,7 +280,7 @@ async def receive_whatsapp_message(request: Request):
                 if results['documents'] and results['documents'][0]:
                     context = "\n\n---\n\n".join(results['documents'][0])
                     
-                system_prompt = f"""You are a helpful real estate assistant. 
+                system_prompt = f"""You are a helpful real estate assistant representing {target_tenant.replace('_', ' ').title()}. 
                 You must answer ONLY using the context below. 
                 If it's not in the context, say EXACTLY: "I do not have verified information regarding that."
                 Keep your answers concise, professional, and formatted nicely for a WhatsApp screen.
@@ -274,8 +289,7 @@ async def receive_whatsapp_message(request: Request):
                 {context}
                 """
 
-                # --- 2. GENERATE ANSWER (Groq LPUs) ---
-                # Notice stream=False. WhatsApp requires the full message at once!
+                # --- 2. GENERATE ANSWER (Groq) ---
                 response = groq_client.chat.completions.create(
                     model="llama-3.3-70b-versatile",
                     messages=[
@@ -286,10 +300,10 @@ async def receive_whatsapp_message(request: Request):
                 )
                 
                 ai_answer = response.choices[0].message.content
-                print(f"[WHATSAPP] AI Answer Generated.")
 
-                # --- 3. SEND THE REPLY TO WHATSAPP ---
-                url = f"https://graph.facebook.com/v18.0/{WHATSAPP_PHONE_ID}/messages"
+                # --- 3. DYNAMIC REPLY ---
+                # We reply from the exact business number the user texted
+                url = f"https://graph.facebook.com/v18.0/{business_phone_id}/messages"
                 headers = {
                     "Authorization": f"Bearer {WHATSAPP_TOKEN}",
                     "Content-Type": "application/json"
@@ -301,13 +315,9 @@ async def receive_whatsapp_message(request: Request):
                     "text": {"body": ai_answer}
                 }
                 
-                send_response = requests.post(url, headers=headers, json=payload)
-                if send_response.status_code == 200:
-                    print("[WHATSAPP] Reply sent successfully!")
-                else:
-                    print(f"[WHATSAPP] Error sending reply: {send_response.text}")
+                requests.post(url, headers=headers, json=payload)
+                print(f"[WHATSAPP] Dynamic reply sent successfully!")
                 
-        # Always return 200 OK fast so Meta knows our server didn't crash
         return {"status": "success"}
         
     except Exception as e:
