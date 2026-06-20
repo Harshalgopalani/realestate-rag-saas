@@ -11,7 +11,14 @@ import shutil
 import fitz 
 from database import SessionLocal, Lead
 from sqlalchemy.orm import Session
+from datetime import datetime
 import sqlite3
+
+class LeadData(BaseModel):
+    tenant: str
+    name: str
+    phone: str
+    email: str
 
 app = FastAPI(title="Real Estate RAG API - Multi-Tenant", version="2.0")
 
@@ -189,7 +196,53 @@ async def create_lead(
 
 
 # Secret passcode to prevent random people from viewing the dashboard
-DASHBOARD_SECRET = "beta123" 
+DASHBOARD_SECRET = "beta123"
+
+# ---------------------------------------------------------
+# LEAD MANAGEMENT SYSTEM (SQLITE)
+# ---------------------------------------------------------
+
+# 1. Create the database table if it doesn't exist
+def init_db():
+    conn = sqlite3.connect("leads.db")
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS leads (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tenant_id TEXT,
+            name TEXT,
+            phone TEXT,
+            email TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+# Run this immediately when the server starts
+init_db()
+
+# 2. Save the lead when a buyer fills out the website form
+@app.post("/api/leads")
+async def save_lead(lead: LeadData):
+    try:
+        conn = sqlite3.connect("leads.db")
+        cursor = conn.cursor()
+        
+        # Insert the data into our table
+        cursor.execute(
+            "INSERT INTO leads (tenant_id, name, phone, email, timestamp) VALUES (?, ?, ?, ?, ?)",
+            (lead.tenant, lead.name, lead.phone, lead.email, datetime.now().isoformat())
+        )
+        conn.commit()
+        conn.close()
+        
+        print(f"[LEAD CAPTURED] {lead.name} saved for tenant: {lead.tenant}")
+        return {"status": "success"}
+        
+    except Exception as e:
+        print(f"[DB SAVE ERROR]: {e}")
+        return {"status": "error"}
 
 @app.get("/api/leads")
 async def get_client_leads(tenant: str, secret: str):
