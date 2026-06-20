@@ -11,6 +11,7 @@ import shutil
 import fitz 
 from database import SessionLocal, Lead
 from sqlalchemy.orm import Session
+import sqlite3
 
 app = FastAPI(title="Real Estate RAG API - Multi-Tenant", version="2.0")
 
@@ -185,17 +186,34 @@ async def create_lead(
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
+
+
+# Secret passcode to prevent random people from viewing the dashboard
+DASHBOARD_SECRET = "beta123" 
+
 @app.get("/api/leads")
-async def get_leads(
-    x_tenant_id: str = Header(...), # Require the Tenant ID
-    db: Session = Depends(get_db)
-):
+async def get_client_leads(tenant: str, secret: str):
+    # Security check
+    if secret != DASHBOARD_SECRET:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+        
     try:
-        # MULTI-TENANT FILTER: Only return leads for this specific tenant!
-        leads = db.query(Lead).filter(Lead.tenant_id == x_tenant_id).order_by(Lead.created_at.desc()).all()
-        return leads
+        # Connect to your SQLite database
+        conn = sqlite3.connect("leads.db")
+        cursor = conn.cursor()
+        
+        # Fetch only the leads for this specific client
+        cursor.execute("SELECT name, phone, email, timestamp FROM leads WHERE tenant_id = ? ORDER BY timestamp DESC", (tenant,))
+        rows = cursor.fetchall()
+        conn.close()
+        
+        # Format the data for the frontend
+        leads = [{"name": r[0], "phone": r[1], "email": r[2], "date": r[3]} for r in rows]
+        return {"status": "success", "leads": leads}
+        
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[DB ERROR]: {e}")
+        return {"status": "error", "leads": []}
     
 
 # ---------------------------------------------------------
