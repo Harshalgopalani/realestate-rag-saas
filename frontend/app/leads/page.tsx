@@ -1,16 +1,15 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
-export default function ClientLeads() {
+function LeadsContent() {
   const searchParams = useSearchParams();
   const tenant = searchParams.get("tenant");
   const secret = searchParams.get("secret");
-  const [leads, setLeads] = useState([]);
+  const [leads, setLeads] = useState<any[]>([]);
 
   useEffect(() => {
     if (tenant && secret) {
-      // Securely fetch leads from your Python backend
       fetch(`https://richportfolio.duckdns.org/api/leads?tenant=${tenant}&secret=${secret}`)
         .then((res) => res.json())
         .then((data) => {
@@ -52,5 +51,13 @@ export default function ClientLeads() {
         </table>
       </div>
     </div>
+  );
+}
+
+export default function ClientLeads() {
+  return (
+    <Suspense fallback={<div className="p-10 text-center text-gray-500">Loading Leads...</div>}>
+      <LeadsContent />
+    </Suspense>
   );
 }
