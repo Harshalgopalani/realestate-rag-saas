@@ -1,7 +1,7 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, Depends, Header, Request, Query
+from fastapi import FastAPI, HTTPException, UploadFile, File, Depends, Header, Request, Query, Form
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import chromadb
 import ollama
 import os
@@ -13,6 +13,9 @@ from database import SessionLocal, Lead
 from sqlalchemy.orm import Session
 from datetime import datetime
 import sqlite3
+import PyPDF2
+import io
+import os
 from pydantic import BaseModel, Field
 from typing import Optional
 
@@ -64,63 +67,70 @@ def chunk_text(text: str, chunk_size: int = 200, overlap: int = 50) -> list:
     return chunks
 
 # ---------------------------------------------------------
-# MULTI-TENANT ENDPOINTS
-# Notice: x_tenant_id: str = Header(...) is required for all!
+# LEAD MANAGEMENT SYSTEM (SQLITE)
 # ---------------------------------------------------------
+
+# ... existing code ...
+
+# ---------------------------------------------------------
+# ADMIN KNOWLEDGE BASE UPLOAD SYSTEM
+# ---------------------------------------------------------
+# We use a hardcoded master password so only YOU can upload files to the AI brain.
+ADMIN_SECRET = "supersecret2026"
 
 @app.post("/api/upload")
 async def upload_document(
-    file: UploadFile = File(...), 
-    x_tenant_id: str = Header(...)  # Require the Tenant ID
+    file: UploadFile = File(...),
+    tenant_id: str = Form(...),
+    secret: str = Form(...)
 ):
+    print(f"\n--- INCOMING UPLOAD FOR {tenant_id} ---")
+    if secret != ADMIN_SECRET:
+        print("[UPLOAD REJECTED]: Invalid Admin Password")
+        return {"status": "error", "message": "Invalid Admin Password"}
+
     try:
-        file_location = f"documents/{x_tenant_id}_{file.filename}"
-        with open(file_location, "wb+") as file_object:
-            shutil.copyfileobj(file.file, file_object)
-        
+        # 1. Read the raw PDF file
+        pdf_reader = PyPDF2.PdfReader(io.BytesIO(await file.read()))
         text = ""
-        if file.filename.endswith(".pdf"):
-            doc = fitz.open(file_location)
-            for page in doc:
-                text += page.get_text().replace('\n', ' ') + " "
-        elif file.filename.endswith(".txt"):
-            with open(file_location, 'r', encoding='utf-8') as f:
-                text = f.read()
-        else:
-            raise HTTPException(status_code=400, detail="Only PDF and TXT files supported.")
+        for page in pdf_reader.pages:
+            extracted = page.extract_text()
+            if extracted:
+                text += extracted + "\n"
 
         if not text.strip():
-            raise HTTPException(status_code=400, detail="Could not extract text.")
+            return {"status": "error", "message": "Could not extract text from this PDF."}
 
-        chunks = chunk_text(text)
+        # 2. Chunk the text (1000 characters per chunk) so the AI can digest it
+        chunks = [text[i:i+1000] for i in range(0, len(text), 1000)]
+        print(f"[PROCESSING]: Broke PDF into {len(chunks)} chunks.")
+
+        # 3. Save to ChromaDB Vector Database, tagged with the Tenant ID
         client = chromadb.PersistentClient(path=DB_PATH)
         collection = client.get_or_create_collection(name=COLLECTION_NAME)
-        
-        # ---------------------------------------------------------
-        # NEW: THE GHOST DATA SWEEPER
-        # Wipe the tenant's existing memory before training the new file
-        # ---------------------------------------------------------
-        try:
-            collection.delete(where={"tenant_id": x_tenant_id})
-            print(f"Cleared old knowledge base for tenant: {x_tenant_id}")
-        except Exception as e:
-            print(f"No existing data to clear.")
-        # ---------------------------------------------------------
 
         for i, chunk in enumerate(chunks):
+            # Convert text into a mathematical vector using Ollama
             embedding = ollama.embeddings(model="nomic-embed-text", prompt=chunk)["embedding"]
             
-            # Because we wiped the old data, we can safely use .add()
+            chunk_id = f"{tenant_id}_{file.filename}_chunk_{i}"
+            
+            # Save the chunk and STRICTLY tag it to this specific tenant
             collection.add(
-                ids=[f"{x_tenant_id}_{file.filename}_{i}"],
+                ids=[chunk_id],
                 embeddings=[embedding],
                 documents=[chunk],
-                metadatas=[{"source": file.filename, "tenant_id": x_tenant_id}] 
+                metadatas=[{"tenant_id": tenant_id}]
             )
             
-        return {"status": "success", "message": f"Processed {file.filename}. The bot's memory is fully refreshed!"}
+        print(f"[UPLOAD SUCCESS]: {file.filename} vectorized for {tenant_id}!\n")
+        return {"status": "success", "message": f"Successfully trained AI on {len(chunks)} chunks."}
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[UPLOAD ERROR]: {e}")
+        return {"status": "error", "message": str(e)}
+
+# ---------------------------------------------------------
 
 @app.post("/api/chat")
 async def chat(request: Request):

@@ -1,187 +1,122 @@
 "use client";
-
 import { useState } from "react";
-import Link from "next/link";
-import {
-  Users,
-  LayoutDashboard,
-  UploadCloud,
-  FileText,
-  CheckCircle2,
-  AlertCircle,
-} from "lucide-react";
+import { UploadCloud, CheckCircle, AlertCircle, Shield } from "lucide-react";
 
-const TENANT_ID = "kukreja_paris"; // Simulating the logged-in builder context
-
-export default function UploadPanel() {
+export default function UploadAdmin() {
+  const [tenant, setTenant] = useState("");
+  const [secret, setSecret] = useState("");
   const [file, setFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [status, setStatus] = useState<{
-    type: "success" | "error";
-    message: string;
-  } | null>(null);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
-      setStatus(null); // Clear previous status messages
-    }
-  };
+  const [status, setStatus] = useState<"idle" | "uploading" | "success" | "error">("idle");
+  const [message, setMessage] = useState("");
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file) return;
+    if (!file || !tenant || !secret) return;
 
-    setIsUploading(true);
-    setStatus(null);
-
-    // HTML forms handle files using FormData instead of standard JSON strings
+    setStatus("uploading");
+    
+    // We must use FormData to send files to the backend
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("tenant_id", tenant.toLowerCase().replace(/\s+/g, '_')); // Forces clean IDs like "godrej_properties"
+    formData.append("secret", secret);
 
     try {
-      const response = await fetch("http://144.91.127.152:8000/api/upload", {
+      const response = await fetch("https://richportfolio.duckdns.org/api/upload", {
         method: "POST",
-        headers: {
-          "x-tenant-id": TENANT_ID, // Passing the lock token
-        },
-        body: formData, // Sending raw multipart form file data
+        body: formData,
       });
 
       const data = await response.json();
 
-      if (response.ok) {
-        setStatus({
-          type: "success",
-          message:
-            data.message ||
-            "Document vectorized and added to your knowledge base successfully!",
-        });
-        setFile(null); // Clear file selector input
+      if (data.status === "success") {
+        setStatus("success");
+        setMessage(data.message);
+        setFile(null);
       } else {
-        setStatus({
-          type: "error",
-          message: data.detail || "Failed to process the document layout.",
-        });
+        setStatus("error");
+        setMessage(data.message);
       }
     } catch (error) {
-      console.error("Upload error:", error);
-      setStatus({
-        type: "error",
-        message: "Failed to establish a connection with the backend engine.",
-      });
-    } finally {
-      setIsUploading(false);
+      setStatus("error");
+      setMessage("Failed to connect to the server.");
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
-      {/* Sidebar Navigation */}
-      <div className="w-full md:w-64 bg-slate-900 text-white flex flex-col p-4 shadow-xl">
-        <div className="flex items-center space-x-2 mb-8 mt-2 px-2">
-          <LayoutDashboard className="text-blue-400" />
-          <h1 className="text-xl font-bold tracking-wider">SaaS Admin</h1>
+    <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center p-6 font-sans">
+      <div className="max-w-md w-full bg-gray-800 rounded-2xl shadow-2xl p-8 border border-gray-700">
+        <div className="flex items-center justify-center mb-6 text-blue-400">
+          <Shield size={40} />
         </div>
-        <nav className="space-y-2 flex-1">
-          {/* Link back to Lead Center */}
-          <Link
-            href="/dashboard"
-            className="w-full flex items-center space-x-3 px-4 py-3 text-gray-300 hover:bg-slate-800 hover:text-white rounded-lg text-sm font-medium transition-colors"
+        <h1 className="text-2xl font-bold text-center mb-2">Master Admin Portal</h1>
+        <p className="text-gray-400 text-center mb-8 text-sm">Upload real estate brochures to train the RAG AI.</p>
+
+        <form onSubmit={handleUpload} className="space-y-5">
+          <div>
+            <label className="block text-sm font-medium text-gray-400 mb-1">Tenant ID (e.g., godrej_properties)</label>
+            <input
+              required
+              type="text"
+              value={tenant}
+              onChange={(e) => setTenant(e.target.value)}
+              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none text-white"
+              placeholder="Client Name"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-400 mb-1">Master Password</label>
+            <input
+              required
+              type="password"
+              value={secret}
+              onChange={(e) => setSecret(e.target.value)}
+              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none text-white"
+              placeholder="Enter admin secret"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-400 mb-1">PDF Brochure</label>
+            <input
+              required
+              type="file"
+              accept=".pdf"
+              onChange={(e) => setFile(e.target.files?.[0] || null)}
+              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={status === "uploading"}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center disabled:bg-blue-800 disabled:cursor-not-allowed mt-4"
           >
-            <Users size={18} />
-            <span>Lead Center</span>
-          </Link>
-          {/* Active Upload Tab */}
-          <button className="w-full flex items-center space-x-3 px-4 py-3 bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors">
-            <UploadCloud size={18} />
-            <span>Knowledge Base</span>
+            {status === "uploading" ? (
+              <span className="animate-pulse">Vectorizing Document...</span>
+            ) : (
+              <>
+                <UploadCloud size={20} className="mr-2" /> Train AI
+              </>
+            )}
           </button>
-        </nav>
-      </div>
+        </form>
 
-      {/* Main Content Area */}
-      <div className="flex-1 p-8 max-w-4xl">
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-gray-800">
-            Knowledge Base Training
-          </h2>
-          <p className="text-gray-500 mt-1">
-            Upload property brochures, layouts, or price lists to instantly
-            retrain your AI chatbot.
-          </p>
-        </div>
+        {}
+        {status === "success" && (
+          <div className="mt-6 bg-green-900/50 border border-green-800 text-green-300 p-4 rounded-lg flex items-start">
+            <CheckCircle size={20} className="mr-2 mt-0.5 flex-shrink-0" />
+            <p className="text-sm">{message}</p>
+          </div>
+        )}
 
-        {/* Upload Card */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <form onSubmit={handleUpload} className="space-y-6">
-            {/* Drag & Drop Visual Box */}
-            <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center bg-gray-50 flex flex-col items-center justify-center hover:border-blue-500 transition-colors relative">
-              <input
-                type="file"
-                accept=".txt,.pdf"
-                onChange={handleFileChange}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                disabled={isUploading}
-              />
-              <UploadCloud size={48} className="text-gray-400 mb-3" />
-              <p className="text-sm font-medium text-gray-700">
-                {file
-                  ? `Selected: ${file.name}`
-                  : "Click or drag file here to select"}
-              </p>
-              <p className="text-xs text-gray-400 mt-1">
-                Supports plain text (.txt) or printable PDF (.pdf)
-              </p>
-            </div>
-
-            {/* Selected File Badge */}
-            {file && (
-              <div className="flex items-center space-x-2 p-3 bg-blue-50 rounded-lg border border-blue-100 text-blue-700 text-sm">
-                <FileText size={18} />
-                <span className="font-medium truncate flex-1">{file.name}</span>
-                <span className="text-xs text-blue-500">
-                  ({(file.size / 1024).toFixed(1)} KB)
-                </span>
-              </div>
-            )}
-
-            {/* Status Feedback Messages */}
-            {status && (
-              <div
-                className={`p-4 rounded-lg flex items-start space-x-3 text-sm border ${
-                  status.type === "success"
-                    ? "bg-green-50 border-green-200 text-green-800"
-                    : "bg-red-50 border-red-200 text-red-800"
-                }`}
-              >
-                {status.type === "success" ? (
-                  <CheckCircle2
-                    size={18}
-                    className="mt-0.5 text-green-600 flex-shrink-0"
-                  />
-                ) : (
-                  <AlertCircle
-                    size={18}
-                    className="mt-0.5 text-red-600 flex-shrink-0"
-                  />
-                )}
-                <span>{status.message}</span>
-              </div>
-            )}
-
-            {/* Action Button */}
-            <div className="flex justify-end">
-              <button
-                type="submit"
-                disabled={!file || isUploading}
-                className="bg-blue-600 text-white font-semibold px-6 py-2.5 rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors shadow-sm"
-              >
-                {isUploading ? "Processing Vector Pipeline..." : "Train AI Bot"}
-              </button>
-            </div>
-          </form>
-        </div>
+        {status === "error" && (
+          <div className="mt-6 bg-red-900/50 border border-red-800 text-red-300 p-4 rounded-lg flex items-start">
+            <AlertCircle size={20} className="mr-2 mt-0.5 flex-shrink-0" />
+            <p className="text-sm">{message}</p>
+          </div>
+        )}
       </div>
     </div>
   );
