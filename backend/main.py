@@ -13,12 +13,14 @@ from database import SessionLocal, Lead
 from sqlalchemy.orm import Session
 from datetime import datetime
 import sqlite3
+from pydantic import BaseModel
+from typing import Optional
 
 class LeadData(BaseModel):
-    tenant: str
-    name: str
-    phone: str
-    email: str
+    tenant: Optional[str] = "unknown_tenant"
+    name: Optional[str] = "unknown_name"
+    phone: Optional[str] = "unknown_phone"
+    email: Optional[str] = "unknown_email"
 
 app = FastAPI(title="Real Estate RAG API - Multi-Tenant", version="2.0")
 
@@ -225,11 +227,17 @@ init_db()
 # 2. Save the lead when a buyer fills out the website form
 @app.post("/api/leads")
 async def save_lead(lead: LeadData):
+    print(f"--- INCOMING LEAD DATA ---")
+    print(f"Tenant: {lead.tenant}")
+    print(f"Name: {lead.name}")
+    print(f"Phone: {lead.phone}")
+    print(f"Email: {lead.email}")
+    print(f"--------------------------")
+
     try:
         conn = sqlite3.connect("leads.db")
         cursor = conn.cursor()
         
-        # Insert the data into our table
         cursor.execute(
             "INSERT INTO leads (tenant_id, name, phone, email, timestamp) VALUES (?, ?, ?, ?, ?)",
             (lead.tenant, lead.name, lead.phone, lead.email, datetime.now().isoformat())
@@ -242,7 +250,7 @@ async def save_lead(lead: LeadData):
         
     except Exception as e:
         print(f"[DB SAVE ERROR]: {e}")
-        return {"status": "error"}
+        return {"status": "error", "message": str(e)}
 
 @app.get("/api/leads")
 async def get_client_leads(tenant: str, secret: str):
