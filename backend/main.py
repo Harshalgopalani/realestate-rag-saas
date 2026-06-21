@@ -123,6 +123,69 @@ async def upload_document(
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/chat")
+async def chat(request: Request):
+    try:
+        # 1. Read the raw request just like we did for leads
+        data = await request.json()
+        user_message = data.get("question", "")
+        tenant_id = request.headers.get("x-tenant-id", "unknown_tenant")
+
+        # 2. Search ChromaDB (RAG)
+        client = chromadb.PersistentClient(path=DB_PATH)
+        collection = client.get_collection(name=COLLECTION_NAME)
+        
+        query_embedding = ollama.embeddings(model="nomic-embed-text", prompt=user_message)["embedding"]
+        
+        results = collection.query(
+            query_embeddings=[query_embedding],
+            n_results=4,
+            where={"tenant_id": tenant_id} 
+        )
+        
+        context = ""
+        if results['documents'] and results['documents'][0]:
+            context = "\n\n---\n\n".join(results['documents'][0])
+            
+        system_prompt = f"""You are a helpful real estate assistant representing {tenant_id.replace('_', ' ').title()}. 
+        You must answer ONLY using the context below. 
+        If it's not in the context, say EXACTLY: "I do not have verified information regarding that."
+        Keep your answers concise, professional, and easy to read.
+        
+        CONTEXT:
+        {context}
+        """
+
+        # 3. Stream the AI Response
+        response = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {'role': 'system', 'content': system_prompt},
+                {'role': 'user', 'content': user_message}
+            ],
+            stream=True
+        )
+        
+        # THE FIX: Only yield valid text, entirely ignoring 'None' or empty chunks
+        def generate():
+            for chunk in response:
+                content = chunk.choices[0].delta.content
+                if content is not None:
+                    yield content
+                    
+        return StreamingResponse(generate(), media_type="text/event-stream")
+
+    except Exception as e:
+        print(f"[CHAT ERROR]: {e}")
+        # Self-healing fallback message if the database is busy
+        def error_generate():
+            yield "I apologize, but I am having trouble connecting to my knowledge base right now. Please try asking again."
+        return StreamingResponse(error_generate(), media_type="text/event-stream")
+
+
+# ---------------------------------------------------------
+# LEAD MANAGEMENT SYSTEM (SQLITE)
+# ---------------------------------------------------------
+
 def init_db():
     try:
         conn = sqlite3.connect("leads.db")
