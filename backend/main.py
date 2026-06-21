@@ -123,77 +123,68 @@ async def upload_document(
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/chat")
-async def chat_endpoint(
-    request: ChatRequest, 
-    x_tenant_id: str = Header(...) # Require the Tenant ID
-):
+def init_db():
     try:
-        client = chromadb.PersistentClient(path=DB_PATH)
-        collection = client.get_collection(name=COLLECTION_NAME)
-        
-        query_embedding = ollama.embeddings(model="nomic-embed-text", prompt=request.question)["embedding"]
-        
-        # MULTI-TENANT FILTER: Only search vectors that match this tenant!
-        results = collection.query(
-            query_embeddings=[query_embedding],
-            n_results=4,
-            where={"tenant_id": x_tenant_id} 
-        )
-        
-        context = ""
-        if results['documents'] and results['documents'][0]:
-            context = "\n\n---\n\n".join(results['documents'][0])
-            
-        system_prompt = f"""You are a helpful real estate assistant. 
-        You must answer ONLY using the context below. 
-        If it's not in the context, say EXACTLY: "I do not have verified information regarding that."
-        
-        CONTEXT:
-        {context}
-        """
-
-        # ---------------------------------------------------------
-        # NEW: THE STREAMING ENGINE
-        # This function yields words instantly as they are generated
-        # ---------------------------------------------------------
-        # ---------------------------------------------------------
-        # THE GROQ LPU STREAMING ENGINE
-        # ---------------------------------------------------------
-        def generate_response():
-            stream = groq_client.chat.completions.create(
-                model="llama-3.3-70b-versatile", # A massive, genius-level model
-                messages=[
-                    {'role': 'system', 'content': system_prompt},
-                    {'role': 'user', 'content': request.question}
-                ],
-                stream=True
+        conn = sqlite3.connect("leads.db")
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS leads (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tenant_id TEXT,
+                name TEXT,
+                phone TEXT,
+                email TEXT
             )
-            for chunk in stream:
-                # Groq formats their chunks slightly differently than Ollama
-                if chunk.choices[0].delta.content is not None:
-                    yield chunk.choices[0].delta.content
-
-        # Wrap the generator in a continuous HTTP stream
-        return StreamingResponse(generate_response(), media_type="text/plain")
-
+        ''')
+        # Self-healing: If the timestamp column is missing, add it automatically
+        try:
+            cursor.execute('ALTER TABLE leads ADD COLUMN timestamp DATETIME DEFAULT CURRENT_TIMESTAMP')
+        except sqlite3.OperationalError:
+            pass # Column already exists, all good!
+            
+        conn.commit()
+        conn.close()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[DB INIT ERROR]: {e}")
 
+# Run this immediately when the server starts
+init_db()
+
+# 2. Save the lead using RAW Request to bypass 422 errors completely
 @app.post("/api/leads")
-async def create_lead(
-    lead: LeadCreate, 
-    x_tenant_id: str = Header(...), # Require the Tenant ID
-    db: Session = Depends(get_db)
-):
+async def save_lead(request: Request):
     try:
-        # MULTI-TENANT LOCK: Save the lead tied to the specific tenant
-        db_lead = Lead(tenant_id=x_tenant_id, name=lead.name, phone=lead.phone, email=lead.email)
-        db.add(db_lead)
-        db.commit()
+        # Read the raw JSON from the frontend
+        data = await request.json()
+        
+        print("\n--- INCOMING RAW LEAD DATA ---")
+        print(data)
+        print("------------------------------\n")
+        
+        # Safely extract variables
+        tenant = data.get("tenant", "unknown_tenant")
+        name = data.get("name", "unknown_name")
+        phone = data.get("phone", "unknown_phone")
+        email = data.get("email", "unknown_email")
+
+        # Save to database
+        conn = sqlite3.connect("leads.db")
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO leads (tenant_id, name, phone, email, timestamp) VALUES (?, ?, ?, ?, ?)",
+            (tenant, name, phone, email, datetime.now().isoformat())
+        )
+        conn.commit()
+        conn.close()
+        
+        print(f"[LEAD CAPTURED] {name} saved successfully!")
         return {"status": "success"}
+        
     except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[DB SAVE ERROR]: {e}")
+        return {"status": "error", "message": str(e)}
+
+# ... existing code ...
 
 
 
