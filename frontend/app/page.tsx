@@ -35,9 +35,13 @@ export default function Home() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-tenant-id": TENANT_ID, // <-- PASSING THE BADGE
         },
-        body: JSON.stringify(leadForm),
+        body: JSON.stringify({
+          tenant: TENANT_ID,          // Uses the constant at the top of your file
+          name: leadForm.name,        // Pulls directly from your state object
+          phone: leadForm.phone,      // Pulls directly from your state object
+          email: leadForm.email,      // Pulls directly from your state object
+        }),
       });
 
       if (response.ok) {
