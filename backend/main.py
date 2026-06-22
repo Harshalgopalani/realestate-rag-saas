@@ -78,22 +78,35 @@ def chunk_text(text: str, chunk_size: int = 200, overlap: int = 50) -> list:
 # We use a hardcoded master password so only YOU can upload files to the AI brain.
 ADMIN_SECRET = "supersecret2026"
 
+# 3. PDF Upload & Training Route
 @app.post("/api/upload")
 async def upload_document(
-    file: UploadFile = File(...),
-    tenant_id: str = Form(...),
-    secret: str = Form(...)
+    file: UploadFile = File(...), 
+    tenant_id: str = Form(...), 
+    secret: str = Form(...),
+    overwrite: str = Form("false") # ADDED: Overwrite flag
 ):
-    print(f"\n--- INCOMING UPLOAD FOR {tenant_id} ---")
     if secret != ADMIN_SECRET:
-        print("[UPLOAD REJECTED]: Invalid Admin Password")
-        return {"status": "error", "message": "Invalid Admin Password"}
-
+        raise HTTPException(status_code=403, detail="Unauthorized")
+        
+    target_tenant = tenant_id.lower().replace(" ", "_")
+    
     try:
-        # 1. Read the raw PDF file
-        pdf_reader = PyPDF2.PdfReader(io.BytesIO(await file.read()))
+        client = chromadb.PersistentClient(path=DB_PATH)
+        collection = client.get_or_create_collection(name=COLLECTION_NAME)
+        
+        # ADDED: Wipe existing data if overwrite is checked
+        if overwrite.lower() == "true":
+            try:
+                collection.delete(where={"tenant_id": target_tenant})
+                print(f"[DB] Wiped previous data for tenant: {target_tenant}")
+            except Exception as e:
+                print(f"[DB] No existing data to delete or error: {e}")
+
+        # Read the PDF
+        reader = PyPDF2.PdfReader(io.BytesIO(await file.read()))
         text = ""
-        for page in pdf_reader.pages:
+        for page in reader.pages:
             extracted = page.extract_text()
             if extracted:
                 text += extracted + "\n"

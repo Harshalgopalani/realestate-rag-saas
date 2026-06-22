@@ -8,6 +8,7 @@ export default function UploadAdmin() {
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<"idle" | "uploading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
+  const [overwrite, setOverwrite] = useState(false);
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,8 +19,9 @@ export default function UploadAdmin() {
     // We must use FormData to send files to the backend
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("tenant_id", tenant.toLowerCase().replace(/\s+/g, '_')); // Forces clean IDs like "godrej_properties"
+    formData.append("tenant_id", tenant.toLowerCase().replace(/\s+/g, '_'));
     formData.append("secret", secret);
+    formData.append("overwrite", overwrite.toString());
 
     try {
       const response = await fetch("https://richportfolio.duckdns.org/api/upload", {
@@ -63,6 +65,22 @@ export default function UploadAdmin() {
               className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none text-white"
               placeholder="Client Name"
             />
+          </div>
+
+          <div className="flex items-center mt-2">
+            <input
+              type="checkbox"
+              id="overwrite"
+              checked={overwrite}
+              onChange={(e) => setOverwrite(e.target.checked)}
+              className="w-4 h-4 text-blue-600 bg-gray-900 border-gray-700 rounded focus:ring-blue-500 focus:ring-2"
+            />
+            <label
+              htmlFor="overwrite"
+              className="ml-2 text-sm font-medium text-gray-400"
+            >
+              Overwrite existing data for this client
+            </label>
           </div>
 
           <div>
