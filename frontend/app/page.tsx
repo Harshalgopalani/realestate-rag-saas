@@ -5,7 +5,7 @@ import { Send, Bot, User, ArrowRight } from "lucide-react";
 
 // 1. THIS IS OUR SIMULATED WIDGET INSTALLATION
 // Change this to "godrej" later to watch the UI break/change!
-const TENANT_ID = "kukreja_paris";
+const TENANT_ID = "godrej_properties";
 
 type Message = {
   role: "user" | "assistant";
