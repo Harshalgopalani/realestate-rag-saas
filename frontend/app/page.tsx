@@ -12,7 +12,6 @@ type Message = {
 // --- THE CHAT WIDGET COMPONENT ---
 function ChatWidget() {
   const searchParams = useSearchParams();
-  // If no tenant is in the URL, fallback to kukreja_paris
   const activeTenant = searchParams.get("tenant") || "kukreja_paris";
 
   const [isLeadCaptured, setIsLeadCaptured] = useState(false);
@@ -26,12 +25,17 @@ function ChatWidget() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  // Auto-scrolling reference
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  // FIX: Reference the scrollable container itself, not the bottom element
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  // Scroll to bottom whenever messages array changes
+  // FIX: Scroll only the inside of the container, preventing Wix parent from jumping
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }
   };
 
   useEffect(() => {
@@ -126,10 +130,7 @@ function ChatWidget() {
   };
 
   return (
-    // FIX 1: Restored the outer centering wrapper (min-h-screen, flex center)
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      
-      {/* FIX 1: Restored the constrained inner box (max-w-2xl) */}
       <div className="w-full max-w-2xl bg-white rounded-xl shadow-xl flex flex-col h-[85vh] max-h-[800px] overflow-hidden border border-gray-200">
         
         <div className="bg-blue-900 text-white p-4 flex items-center shadow-md z-10">
@@ -156,7 +157,8 @@ function ChatWidget() {
           </div>
         ) : (
           <>
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+            {/* FIX: Attached the chatContainerRef here so only this box scrolls */}
+            <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
               {messages.map((msg, index) => (
                 <div key={index} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                   <div className={`flex max-w-[80%] rounded-lg p-3 ${msg.role === "user" ? "bg-blue-600 text-white" : "bg-white border border-gray-200 text-gray-800 shadow-sm"}`}>
@@ -170,7 +172,6 @@ function ChatWidget() {
                 </div>
               ))}
               
-              {/* FIX 3: Premium Bouncy "Thinking" Animation */}
               {isLoading && (
                 <div className="flex justify-start">
                   <div className="bg-white border border-gray-200 shadow-sm rounded-lg p-4 flex items-center space-x-2">
@@ -183,9 +184,6 @@ function ChatWidget() {
                   </div>
                 </div>
               )}
-              
-              {/* FIX 4: Auto-scroll target */}
-              <div ref={messagesEndRef} />
             </div>
 
             <form onSubmit={sendMessage} className="p-4 bg-white border-t border-gray-200 flex">
@@ -201,7 +199,6 @@ function ChatWidget() {
   );
 }
 
-// --- THE MAIN EXPORT (Wrapped for Next.js URL param safety) ---
 export default function Home() {
   return (
     <Suspense fallback={<div className="p-10 text-center min-h-screen flex items-center justify-center">Loading Chat Experience...</div>}>
