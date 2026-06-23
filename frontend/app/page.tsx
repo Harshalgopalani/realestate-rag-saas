@@ -134,7 +134,7 @@ function ChatWidget() {
         
         <div className="bg-blue-900 text-white p-4 flex items-center shadow-md z-10">
           <Bot className="mr-2" size={24} />
-          <h1 className="text-xl font-bold">Property Assistant</h1>
+          <h1 className="text-xl font-bold">Property Assistant 24/7 Available</h1>
         </div>
 
         {!isLeadCaptured ? (
@@ -189,7 +189,7 @@ function ChatWidget() {
             </div>
 
             <form onSubmit={sendMessage} className="p-4 bg-white border-t border-gray-200 flex">
-              <input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask about pricing, amenities..." disabled={isLoading} className="flex-1 border border-gray-300 rounded-l-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-black" />
+              <input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask about locations, amenities, investment opportunity" disabled={isLoading} className="flex-1 border border-gray-300 rounded-l-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-black" />
               <button type="submit" disabled={isLoading || !input.trim()} className="bg-blue-600 text-white px-4 py-2 rounded-r-lg hover:bg-blue-700 disabled:bg-blue-300 transition-colors">
                 <Send size={18} />
               </button>
