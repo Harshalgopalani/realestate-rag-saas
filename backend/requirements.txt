@@ -1,6 +1,6 @@
 chromadb==0.4.24
 PyMuPDF==1.23.21
-ollama==0.1.7
+ollama>=0.2.0
 fastapi
 uvicorn
 pydantic
