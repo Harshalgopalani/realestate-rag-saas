@@ -306,7 +306,7 @@ WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
 # Use an empty string fallback so it never creates a "None" key
 phone_id_key = os.getenv("WHATSAPP_PHONE_ID", "default_number")
 TENANT_ROUTER = {
-    phone_id_key: "luxe_properties",
+    phone_id_key: "craftpx_properties",
 }
 
 @app.post("/api/webhook")
