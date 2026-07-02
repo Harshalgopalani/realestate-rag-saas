@@ -197,8 +197,8 @@ class ClientOnboard(BaseModel):
 
 def send_credentials_email(target_email: str, company: str, tenant_id: str):
     # --- EMAIL CONFIGURATION ---
-    sender_email = "YOUR_EMAIL@gmail.com"  # Replace with your SVE business email
-    sender_password = "YOUR_APP_PASSWORD"  # Replace with Gmail App Password
+    sender_email = "harshalgopalani@gmail.com"  # Replace with your SVE business email
+    sender_password = "zrfk hpip wpef dlxs"  # Replace with Gmail App Password
     
     subject = f"Welcome to Shree Vinayak Enterprises - Your AI Chatbot Credentials"
     
@@ -379,7 +379,7 @@ async def chat(request: Request):
             
         system_prompt = f"""You are a helpful real estate assistant representing {tenant_id.replace('_', ' ').title()}. 
         You must answer ONLY using the context below. 
-        If it's not in the context, say EXACTLY: "I do not have verified information regarding that."
+        If it's not in the context, say EXACTLY: "I may not have information regarding that. For any other information about the property, please call or WhatsApp us at **8446229667**."
         Keep your answers concise, professional, and easy to read.
         
         CONTEXT:
