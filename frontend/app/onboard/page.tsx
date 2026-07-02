@@ -92,7 +92,7 @@ export default function OnboardingPage() {
             <div className="flex items-start space-x-3">
               <input required type="checkbox" id="legal_agree" className="mt-1 w-5 h-5 text-blue-600" checked={formData.agreed_to_terms} onChange={(e) => setFormData({...formData, agreed_to_terms: e.target.checked})} />
               <label htmlFor="legal_agree" className="text-sm text-gray-700 leading-relaxed cursor-pointer">
-                I hereby declare that I am an authorized representative of the Company. I have read, understood, and agree to the <strong>Master Subscription Agreement</strong>. I acknowledge that Shree Vinayak Enterprises operates strictly as a Data Processor and Technology Intermediary, and the Company retains full liability for all uploaded content, generated AI outputs, and end-user data collection under DPDPA 2023 and RERA regulations.
+                I hereby declare that I am an authorized representative of the Company. I have read, understood, and agree to the <a href="/msa_agreement.pdf" target="_blank" className="text-blue-600 underline font-bold">Master Subscription Agreement (PDF)</a>. I acknowledge that Shree Vinayak Enterprises operates strictly as a Data Processor, and the Company retains full liability for all uploaded content and end-user data under DPDPA 2023 and RERA.
               </label>
             </div>
           </div>

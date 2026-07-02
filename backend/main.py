@@ -513,3 +513,34 @@ async def receive_whatsapp_message(request: Request):
     except Exception as e:
         print(f"[WHATSAPP ERROR]: {e}")
         return {"status": "error"}
+    
+
+# ---------------------------------------------------------
+# SUPER ADMIN DASHBOARD (LEGAL LOGS)
+# ---------------------------------------------------------
+
+@app.get("/api/admin/clients")
+async def get_all_clients(secret: str):
+    # Protect this route with your Master Password
+    if secret != ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+        
+    try:
+        conn = sqlite3.connect("clients.db")
+        cursor = conn.cursor()
+        
+        # Fetch all onboarding records
+        cursor.execute("SELECT tenant_id, company_name, email, ip_address, timestamp FROM clients ORDER BY timestamp DESC")
+        rows = cursor.fetchall()
+        conn.close()
+        
+        clients = [
+            {"tenant_id": r[0], "company_name": r[1], "email": r[2], "ip_address": r[3], "timestamp": r[4]} 
+            for r in rows
+        ]
+        
+        return {"status": "success", "clients": clients}
+        
+    except Exception as e:
+        print(f"[ADMIN DB ERROR]: {e}")
+        return {"status": "error", "message": str(e)}
