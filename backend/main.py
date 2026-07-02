@@ -12,6 +12,10 @@ import io
 import sqlite3
 from datetime import datetime
 from groq import Groq
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import re
 
 # ---------------------------------------------------------
 # INITIALIZATION
@@ -82,6 +86,25 @@ def init_db():
     ''')
     conn.commit()
     conn.close()
+
+def init_client_db():
+    conn = sqlite3.connect("clients.db")
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS clients (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tenant_id TEXT,
+            company_name TEXT,
+            email TEXT,
+            ip_address TEXT,
+            agreed_to_terms BOOLEAN,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+init_client_db()
 
 # Run this immediately when the server starts
 init_db()
@@ -159,6 +182,108 @@ async def get_client_leads(tenant: str, secret: str):
     except Exception as e:
         print(f"[DB ERROR]: {e}")
         return {"status": "error", "leads": []}
+
+#----------------------------------------------------------
+
+# ---------------------------------------------------------
+# AUTOMATED ONBOARDING & LEGAL CLICKWRAP SYSTEM
+# ---------------------------------------------------------
+
+class ClientOnboard(BaseModel):
+    company_name: str
+    project_name: str
+    email: str
+    agreed_to_terms: bool
+
+def send_credentials_email(target_email: str, company: str, tenant_id: str):
+    # --- EMAIL CONFIGURATION ---
+    sender_email = "YOUR_EMAIL@gmail.com"  # Replace with your SVE business email
+    sender_password = "YOUR_APP_PASSWORD"  # Replace with Gmail App Password
+    
+    subject = f"Welcome to Shree Vinayak Enterprises - Your AI Chatbot Credentials"
+    
+    # HTML Email Template
+    html_content = f"""
+    <html>
+      <body style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
+        <h2 style="color: #1e3a8a;">Welcome aboard, {company}!</h2>
+        <p>Your dedicated AI Property Assistant infrastructure is ready.</p>
+        
+        <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p><strong>Your Unique Tenant ID:</strong> <span style="color: #2563eb; font-weight: bold;">{tenant_id}</span></p>
+        </div>
+
+        <h3>Your SaaS Links:</h3>
+        <ul>
+            <li><strong>Upload & Train AI:</strong> <a href="https://richportfolio.duckdns.org/upload">Master Admin Portal</a></li>
+            <li><strong>View Live Leads:</strong> <a href="https://richportfolio.duckdns.org/dashboard?tenant={tenant_id}&secret=beta123">Magic Link Dashboard</a></li>
+        </ul>
+
+        <h3>Website Integration Code:</h3>
+        <p>Provide this exact code to your web developer to embed the chatbot on your site:</p>
+        <pre style="background-color: #1f2937; color: #fff; padding: 15px; border-radius: 8px; overflow-x: auto;">
+&lt;iframe 
+  src="https://richportfolio.duckdns.org/?tenant={tenant_id}" 
+  style="position: fixed; bottom: 20px; right: 20px; width: 380px; height: 600px; border: none; z-index: 99999; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.15);"
+&gt;&lt;/iframe&gt;
+        </pre>
+
+        <p><em>As agreed in the Master Subscription Agreement, you are fully responsible for the accuracy of the documents you upload and the handling of the lead data captured.</em></p>
+        <br/>
+        <p>Best regards,<br/><strong>Shree Vinayak Enterprises</strong></p>
+      </body>
+    </html>
+    """
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = f"Shree Vinayak Enterprises <{sender_email}>"
+    msg["To"] = target_email
+    msg.attach(MIMEText(html_content, "html"))
+
+    try:
+        server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
+        server.login(sender_email, sender_password)
+        server.sendmail(sender_email, target_email, msg.as_string())
+        server.quit()
+        print(f"[EMAIL SUCCESS] Credentials sent to {target_email}")
+    except Exception as e:
+        print(f"[EMAIL ERROR] Failed to send to {target_email}: {e}")
+
+@app.post("/api/onboard")
+async def onboard_client(request: Request, client_data: ClientOnboard, background_tasks: BackgroundTasks):
+    if not client_data.agreed_to_terms:
+        raise HTTPException(status_code=400, detail="Client must legally agree to terms.")
+    
+    # Generate a clean, lowercase, no-spaces Tenant ID
+    clean_company = re.sub(r'[^a-zA-Z0-9]', '', client_data.company_name.lower())
+    clean_project = re.sub(r'[^a-zA-Z0-9]', '', client_data.project_name.lower())
+    tenant_id = f"{clean_company}_{clean_project}"
+    
+    # Capture IP address for legal Clickwrap proof
+    client_ip = request.client.host if request.client else "unknown"
+
+    try:
+        conn = sqlite3.connect("clients.db")
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO clients (tenant_id, company_name, email, ip_address, agreed_to_terms) VALUES (?, ?, ?, ?, ?)",
+            (tenant_id, client_data.company_name, client_data.email, client_ip, True)
+        )
+        conn.commit()
+        conn.close()
+        
+        print(f"[NEW CLIENT LOGGED] {client_data.company_name} bound to MSA from IP {client_ip}")
+        
+        # Fire the email in the background so the frontend doesn't hang
+        background_tasks.add_task(send_credentials_email, client_data.email, client_data.company_name, tenant_id)
+        
+        return {"status": "success", "message": "Onboarding complete."}
+        
+    except Exception as e:
+        print(f"[ONBOARDING ERROR]: {e}")
+        return {"status": "error", "message": "Failed to process onboarding."}
+
 
 # ---------------------------------------------------------
 # ADMIN KNOWLEDGE BASE UPLOAD SYSTEM
