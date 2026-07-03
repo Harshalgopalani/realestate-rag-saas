@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, Suspense } from "react";
-import { Send, Bot, User, ArrowRight } from "lucide-react";
+import { Send, Bot, User, ArrowRight, ShieldAlert } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 
 type Message = {
@@ -16,6 +16,10 @@ function ChatWidget() {
 
   const [isLeadCaptured, setIsLeadCaptured] = useState(false);
   const [leadForm, setLeadForm] = useState({ name: "", phone: "", email: "" });
+  
+  // LEGAL UPDATE: State for the mandatory consent checkbox
+  const [consentGiven, setConsentGiven] = useState(false);
+
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
@@ -25,10 +29,8 @@ function ChatWidget() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  // FIX: Reference the scrollable container itself, not the bottom element
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  // FIX: Scroll only the inside of the container, preventing Wix parent from jumping
   const scrollToBottom = () => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTo({
@@ -44,6 +46,8 @@ function ChatWidget() {
 
   const handleLeadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!consentGiven) return; // Double protection
+    
     setIsLoading(true);
 
     try {
@@ -131,33 +135,49 @@ function ChatWidget() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl bg-white rounded-xl shadow-xl flex flex-col h-[85vh] max-h-[800px] overflow-hidden border border-gray-200">
+      <div className="w-full max-w-2xl bg-white rounded-xl shadow-xl flex flex-col h-[85vh] max-h-[800px] overflow-hidden border border-gray-200 relative">
         
         <div className="bg-blue-900 text-white p-4 flex items-center shadow-md z-10">
           <Bot className="mr-2" size={24} />
-          <h1 className="text-xl font-bold">Property Assistant 24/7 Available</h1>
+          <h1 className="text-xl font-bold">Property Assistant</h1>
         </div>
 
         {!isLeadCaptured ? (
           <div className="flex-1 flex flex-col justify-center items-center p-8 bg-gray-50 overflow-y-auto">
             <Bot size={48} className="text-blue-600 mb-4" />
             <h2 className="text-2xl font-bold text-gray-800 mb-2">Welcome</h2>
-            <p className="text-gray-600 mb-8 text-center">
-              Please enter your details to chat with our AI property assistant.
+            <p className="text-gray-600 mb-8 text-center text-sm">
+              Enter your details to chat with our AI property assistant.
             </p>
 
             <form onSubmit={handleLeadSubmit} className="w-full max-w-sm space-y-4">
               <input required type="text" placeholder="Full Name" className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none text-black" value={leadForm.name} onChange={(e) => setLeadForm({ ...leadForm, name: e.target.value })} />
               <input required type="email" placeholder="Email Address" className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none text-black" value={leadForm.email} onChange={(e) => setLeadForm({ ...leadForm, email: e.target.value })} />
               <input required type="tel" placeholder="Phone Number" className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none text-black" value={leadForm.phone} onChange={(e) => setLeadForm({ ...leadForm, phone: e.target.value })} />
-              <button type="submit" disabled={isLoading} className="w-full bg-blue-600 text-white font-bold rounded-lg px-4 py-3 hover:bg-blue-700 transition-colors flex justify-center items-center">
+              
+              {/* LEGAL UPDATE 1: DPDPA Consent Checkbox */}
+              <div className="flex items-start space-x-2 pt-2">
+                <input required type="checkbox" id="user_consent" className="mt-1 w-4 h-4 cursor-pointer" checked={consentGiven} onChange={(e) => setConsentGiven(e.target.checked)} />
+                <label htmlFor="user_consent" className="text-xs text-gray-600 cursor-pointer leading-tight">
+                  I consent to being contacted regarding this property inquiry via phone, WhatsApp, or email by the authorized sales team.
+                </label>
+              </div>
+
+              {/* LEGAL UPDATE 2: Lead Capture Disclaimer */}
+              <div className="bg-blue-50 p-3 rounded-lg flex items-start space-x-2 border border-blue-100">
+                <ShieldAlert size={14} className="text-blue-600 flex-shrink-0 mt-0.5" />
+                <p className="text-[10px] text-gray-600 leading-tight">
+                  This chatbot uses Artificial Intelligence to answer queries based on developer-provided materials. It does not constitute a legally binding offer.
+                </p>
+              </div>
+
+              <button type="submit" disabled={isLoading || !consentGiven} className="w-full bg-blue-600 text-white font-bold rounded-lg px-4 py-3 hover:bg-blue-700 disabled:bg-gray-400 transition-colors flex justify-center items-center mt-2">
                 {isLoading ? "Starting Chat..." : "Start Chatting"} <ArrowRight size={18} className="ml-2" />
               </button>
             </form>
           </div>
         ) : (
           <>
-            {/* FIX: Attached the chatContainerRef here so only this box scrolls */}
             <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
               {messages.map((msg, index) => (
                 <div key={index} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
@@ -186,12 +206,21 @@ function ChatWidget() {
               )}
             </div>
 
-            <form onSubmit={sendMessage} className="p-4 bg-white border-t border-gray-200 flex">
-              <input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask about locations, amenities, investment opportunity" disabled={isLoading} className="flex-1 border border-gray-300 rounded-l-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-black" />
-              <button type="submit" disabled={isLoading || !input.trim()} className="bg-blue-600 text-white px-4 py-2 rounded-r-lg hover:bg-blue-700 disabled:bg-blue-300 transition-colors">
-                <Send size={18} />
-              </button>
-            </form>
+            <div className="bg-white border-t border-gray-200 flex flex-col">
+              <form onSubmit={sendMessage} className="p-4 flex pb-2">
+                <input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask about pricing, amenities..." disabled={isLoading} className="flex-1 border border-gray-300 rounded-l-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-black" />
+                <button type="submit" disabled={isLoading || !input.trim()} className="bg-blue-600 text-white px-4 py-2 rounded-r-lg hover:bg-blue-700 disabled:bg-blue-300 transition-colors">
+                  <Send size={18} />
+                </button>
+              </form>
+              
+              {/* LEGAL UPDATE 3: Permanent Chat "Safe Harbor" Footer */}
+              <div className="px-4 pb-3 text-center">
+                <p className="text-[10px] text-gray-400 leading-tight">
+                  Responses are AI-generated for informational purposes. Please verify all pricing, availability, and RERA details with the official sales team.
+                </p>
+              </div>
+            </div>
           </>
         )}
       </div>
